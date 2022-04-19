@@ -3,12 +3,16 @@
  * @author Kuitos
  * @since 2020-3-31
  */
-import type { SandBox } from '../interfaces';
-import { SandBoxType } from '../interfaces';
-import { nativeGlobal, nextTask } from '../utils';
-import { getTargetValue, setCurrentRunningApp, getCurrentRunningApp } from './common';
+import type { SandBox } from "../interfaces";
+import { SandBoxType } from "../interfaces";
+import { nativeGlobal, nextTask } from "../utils";
+import {
+  getTargetValue,
+  setCurrentRunningApp,
+  getCurrentRunningApp,
+} from "./common";
 
-type SymbolTarget = 'target' | 'globalContext';
+type SymbolTarget = "target" | "globalContext";
 
 type FakeWindow = Window & Record<PropertyKey, any>;
 
@@ -26,11 +30,11 @@ function uniq(array: Array<string | symbol>) {
 const rawObjectDefineProperty = Object.defineProperty;
 
 const variableWhiteListInDev =
-  process.env.NODE_ENV === 'development' || window.__QIANKUN_DEVELOPMENT__
+  process.env.NODE_ENV === "development" || window.__QIANKUN_DEVELOPMENT__
     ? [
         // for react hot reload
         // see https://github.com/facebook/create-react-app/blob/66bf7dfc43350249e2f09d138a20840dae8a0a4a/packages/react-error-overlay/src/index.js#L180
-        '__REACT_ERROR_OVERLAY_GLOBAL_HOOK__',
+        "__REACT_ERROR_OVERLAY_GLOBAL_HOOK__",
       ]
     : [];
 // who could escape the sandbox
@@ -38,10 +42,10 @@ const variableWhiteList: PropertyKey[] = [
   // FIXME System.js used a indirect call with eval, which would make it scope escape to global
   // To make System.js works well, we write it back to global window temporary
   // see https://github.com/systemjs/systemjs/blob/457f5b7e8af6bd120a279540477552a07d5de086/src/evaluate.js#L106
-  'System',
+  "System",
 
   // see https://github.com/systemjs/systemjs/blob/457f5b7e8af6bd120a279540477552a07d5de086/src/instantiate.js#L357
-  '__cjsWrapper',
+  "__cjsWrapper",
   ...variableWhiteListInDev,
 ];
 
@@ -74,8 +78,8 @@ const unscopables = {
 };
 
 const useNativeWindowForBindingsProps = new Map<PropertyKey, boolean>([
-  ['fetch', true],
-  ['mockDomAPIInBlackList', process.env.NODE_ENV === 'test'],
+  ["fetch", true],
+  ["mockDomAPIInBlackList", process.env.NODE_ENV === "test"],
 ]);
 
 function createFakeWindow(globalContext: Window) {
@@ -102,7 +106,10 @@ function createFakeWindow(globalContext: Window) {
     .forEach((p) => {
       const descriptor = Object.getOwnPropertyDescriptor(globalContext, p);
       if (descriptor) {
-        const hasGetter = Object.prototype.hasOwnProperty.call(descriptor, 'get');
+        const hasGetter = Object.prototype.hasOwnProperty.call(
+          descriptor,
+          "get"
+        );
 
         /*
          make top/self/window property configurable and writable, otherwise it will cause TypeError while get trap return.
@@ -110,11 +117,12 @@ function createFakeWindow(globalContext: Window) {
          > The value reported for a property must be the same as the value of the corresponding target object property if the target object property is a non-writable, non-configurable data property.
          */
         if (
-          p === 'top' ||
-          p === 'parent' ||
-          p === 'self' ||
-          p === 'window' ||
-          (process.env.NODE_ENV === 'test' && (p === 'mockTop' || p === 'mockSafariTop'))
+          p === "top" ||
+          p === "parent" ||
+          p === "self" ||
+          p === "window" ||
+          (process.env.NODE_ENV === "test" &&
+            (p === "mockTop" || p === "mockSafariTop"))
         ) {
           descriptor.configurable = true;
           /*
@@ -184,10 +192,11 @@ export default class ProxySandbox implements SandBox {
   }
 
   inactive() {
-    if (process.env.NODE_ENV === 'development') {
-      console.info(`[qiankun:sandbox] ${this.name} modified global properties restore...`, [
-        ...this.updatedValueSet.keys(),
-      ]);
+    if (process.env.NODE_ENV === "development") {
+      console.info(
+        `[qiankun:sandbox] ${this.name} modified global properties restore...`,
+        [...this.updatedValueSet.keys()]
+      );
     }
 
     if (--activeSandboxCount === 0) {
@@ -209,10 +218,12 @@ export default class ProxySandbox implements SandBox {
     const { updatedValueSet } = this;
     // 全局对象上所有不可配置属性都在 fakeWindow 中，
     //  且其中具有 getter 属性的属性还存在 propertesWithGetter map 中，value 为 true
-    const { fakeWindow, propertiesWithGetter } = createFakeWindow(globalContext);
+    const { fakeWindow, propertiesWithGetter } =
+      createFakeWindow(globalContext);
 
     const descriptorTargetMap = new Map<PropertyKey, SymbolTarget>();
-    const hasOwnProperty = (key: PropertyKey) => fakeWindow.hasOwnProperty(key) || globalContext.hasOwnProperty(key);
+    const hasOwnProperty = (key: PropertyKey) =>
+      fakeWindow.hasOwnProperty(key) || globalContext.hasOwnProperty(key);
 
     const proxy = new Proxy(fakeWindow, {
       set: (target: FakeWindow, p: PropertyKey, value: any): boolean => {
@@ -223,7 +234,10 @@ export default class ProxySandbox implements SandBox {
           // 当属性之前在globalContext中存在时，我们必须保持它的描述
           // 修改
           if (!target.hasOwnProperty(p) && globalContext.hasOwnProperty(p)) {
-            const descriptor = Object.getOwnPropertyDescriptor(globalContext, p);
+            const descriptor = Object.getOwnPropertyDescriptor(
+              globalContext,
+              p
+            );
             const { writable, configurable, enumerable } = descriptor!;
             if (writable) {
               Object.defineProperty(target, p, {
@@ -249,8 +263,10 @@ export default class ProxySandbox implements SandBox {
           return true;
         }
 
-        if (process.env.NODE_ENV === 'development') {
-          console.warn(`[qiankun] Set window.${p.toString()} while sandbox destroyed or inactive in ${name}!`);
+        if (process.env.NODE_ENV === "development") {
+          console.warn(
+            `[qiankun] Set window.${p.toString()} while sandbox destroyed or inactive in ${name}!`
+          );
         }
         // 在 strict-mode 下，Proxy 的 handler.set 返回 false 会抛出 TypeError，在沙箱卸载的情况下应该忽略错误
         return true;
@@ -263,19 +279,20 @@ export default class ProxySandbox implements SandBox {
         // 避免通过 window.window 或者 window.self 来获取到原始的window
         // avoid who using window.window or window.self to escape the sandbox environment to touch the really window
         // see https://github.com/eligrey/FileSaver.js/blob/master/src/FileSaver.js#L13
-        if (p === 'window' || p === 'self') {
+        if (p === "window" || p === "self") {
           return proxy;
         }
 
         // hijack globalWindow accessing with globalThis keyword
-        if (p === 'globalThis') {
+        if (p === "globalThis") {
           return proxy;
         }
 
         if (
-          p === 'top' ||
-          p === 'parent' ||
-          (process.env.NODE_ENV === 'test' && (p === 'mockTop' || p === 'mockSafariTop'))
+          p === "top" ||
+          p === "parent" ||
+          (process.env.NODE_ENV === "test" &&
+            (p === "mockTop" || p === "mockSafariTop"))
         ) {
           // if your master app in an iframe context, allow these props escape the sandbox
           if (globalContext === globalContext.parent) {
@@ -285,15 +302,15 @@ export default class ProxySandbox implements SandBox {
         }
 
         // proxy.hasOwnProperty would invoke getter firstly, then its value represented as globalContext.hasOwnProperty
-        if (p === 'hasOwnProperty') {
+        if (p === "hasOwnProperty") {
           return hasOwnProperty;
         }
 
-        if (p === 'document') {
+        if (p === "document") {
           return document;
         }
 
-        if (p === 'eval') {
+        if (p === "eval") {
           return eval;
         }
 
@@ -308,7 +325,9 @@ export default class ProxySandbox implements SandBox {
              const proxyFetch = fetch.bind(proxy);
              proxyFetch('https://qiankun.com');
         */
-        const boundTarget = useNativeWindowForBindingsProps.get(p) ? nativeGlobal : globalContext;
+        const boundTarget = useNativeWindowForBindingsProps.get(p)
+          ? nativeGlobal
+          : globalContext;
         return getTargetValue(boundTarget, value);
       },
 
@@ -318,7 +337,10 @@ export default class ProxySandbox implements SandBox {
         return p in unscopables || p in target || p in globalContext;
       },
 
-      getOwnPropertyDescriptor(target: FakeWindow, p: string | number | symbol): PropertyDescriptor | undefined {
+      getOwnPropertyDescriptor(
+        target: FakeWindow,
+        p: string | number | symbol
+      ): PropertyDescriptor | undefined {
         /*
          as the descriptor of top/self/window/mockTop in raw window are configurable but not in proxy target, we need to get it from target to avoid TypeError
          see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy/handler/getOwnPropertyDescriptor
@@ -326,13 +348,13 @@ export default class ProxySandbox implements SandBox {
          */
         if (target.hasOwnProperty(p)) {
           const descriptor = Object.getOwnPropertyDescriptor(target, p);
-          descriptorTargetMap.set(p, 'target');
+          descriptorTargetMap.set(p, "target");
           return descriptor;
         }
 
         if (globalContext.hasOwnProperty(p)) {
           const descriptor = Object.getOwnPropertyDescriptor(globalContext, p);
-          descriptorTargetMap.set(p, 'globalContext');
+          descriptorTargetMap.set(p, "globalContext");
           // A property cannot be reported as non-configurable, if it does not exists as an own property of the target object
           if (descriptor && !descriptor.configurable) {
             descriptor.configurable = true;
@@ -345,24 +367,33 @@ export default class ProxySandbox implements SandBox {
 
       // trap to support iterator with sandbox
       ownKeys(target: FakeWindow): ArrayLike<string | symbol> {
-        return uniq(Reflect.ownKeys(globalContext).concat(Reflect.ownKeys(target)));
+        return uniq(
+          Reflect.ownKeys(globalContext).concat(Reflect.ownKeys(target))
+        );
       },
 
-      defineProperty(target: Window, p: PropertyKey, attributes: PropertyDescriptor): boolean {
+      defineProperty(
+        target: Window,
+        p: PropertyKey,
+        attributes: PropertyDescriptor
+      ): boolean {
         const from = descriptorTargetMap.get(p);
         /*
          Descriptor must be defined to native window while it comes from native window via Object.getOwnPropertyDescriptor(window, p),
          otherwise it would cause a TypeError with illegal invocation.
          */
         switch (from) {
-          case 'globalContext':
+          case "globalContext":
             return Reflect.defineProperty(globalContext, p, attributes);
           default:
             return Reflect.defineProperty(target, p, attributes);
         }
       },
 
-      deleteProperty: (target: FakeWindow, p: string | number | symbol): boolean => {
+      deleteProperty: (
+        target: FakeWindow,
+        p: string | number | symbol
+      ): boolean => {
         this.registerRunningApp(name, proxy);
         if (target.hasOwnProperty(p)) {
           // @ts-ignore
